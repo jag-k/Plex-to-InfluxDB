@@ -312,7 +312,7 @@ class plexInfluxdbCollector():
                 audioCodec = stream.find('Media').attrib['audioCodec']
                 container = stream.find('Media').attrib['container']
                 length_ms = int(stream.find('Media').attrib['duration'])
-                state = stream.find['Player'].attrib['state']
+                status = stream.find['Player'].attrib['state']
                 platform = stream.find['Player'].attrib['platform']
                 position = int(stream.find['viewOffset'])
                 year = stream.attrib['year']
@@ -356,8 +356,8 @@ class plexInfluxdbCollector():
                             'parentIndex': parentIndex,
                             'title': title,
                             'index': index,
-                            'year': year
-                            'state': state,
+                            'year': year,
+                            'status': status,
                             'platform_ms': platform,
                             'position': position
                         },
