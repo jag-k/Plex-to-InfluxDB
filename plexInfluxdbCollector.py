@@ -231,8 +231,8 @@ class plexInfluxdbCollector():
         :param stream_data:
         :return:
         """
-        # TODO: Add playback percent, bitrates, framerates,  width x height
-        
+        # TODO: Add width x height
+
         self.send_log('Processing Active Streams', 'info')
 
         combined_streams = 0
@@ -286,9 +286,11 @@ class plexInfluxdbCollector():
                 player_state = ""
                 platform = ""
                 position = 0
+                pos_percent = 0
                 transcode_video = ""
                 transcode_audio = ""
                 video_codec = ""
+                video_framerate = ""
 
                 if session_id in self.active_streams:
                     start_time = self.active_streams[session_id]['start_time']
@@ -338,6 +340,7 @@ class plexInfluxdbCollector():
                         else:
                             transcode_video = "DirectPlay"
                             transcode_audio = "DirectPlay"
+                        video_framerate = stream.find('Media').attrib['videoFrameRate']
                         video_codec = stream.find('Media').attrib['videoCodec']
                     else:
                         resolution = stream.find('Media').attrib['bitrate'] + ' Kbps'
@@ -345,9 +348,10 @@ class plexInfluxdbCollector():
                     audio_codec = stream.find('Media').attrib['audioCodec']
                     container = stream.find('Media').attrib['container']
                     length_ms = int(stream.find('Media').attrib['duration'])
-
-                    platform = stream.find('Player').attrib['platform']
                     position = int(stream.attrib['viewOffset'])
+                    if position > 0 and length_ms >0:
+                        pos_percent = round(position / length_ms,4)
+                    platform = stream.find('Player').attrib['platform']
                     title = stream.attrib['title']
                     if 'index' in stream.attrib:
                         index = int(stream.attrib['index'])
@@ -396,7 +400,9 @@ class plexInfluxdbCollector():
                             'year': year,
                             'status': player_state,
                             'platform': platform,
-                            'position_ms': position
+                            'position_ms': position,
+                            'pos_percent': pos_percent,
+                            'video_framerate': video_framerate
                         },
                         'tags': {
                             'host': host,
