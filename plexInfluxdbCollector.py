@@ -293,12 +293,12 @@ class plexInfluxdbCollector():
                     container = stream.find('Media').attrib['container']
                     audioCodec = stream.find('Media').attrib['audioCodec']
                     videoCodec = stream.find('Media').attrib['videoCodec']
-                    length_ms = stream.find('Media').attrib['duration']
+                    length_ms = int(stream.find('Media').attrib['duration'])
                 else:
                     resolution = stream.find('Media').attrib['bitrate'] + ' Kbps'
                     container = stream.find('Media').attrib['container']
                     audioCodec = stream.find('Media').attrib['audioCodec']
-                    length_ms = stream.find('Media').attrib['duration']
+                    length_ms = int(stream.find('Media').attrib['duration'])
 
                 self.send_log('Title: {}'.format(full_title), 'debug')
                 self.send_log('Media Type: {}'.format(media_type), 'debug')
