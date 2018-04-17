@@ -260,6 +260,9 @@ class plexInfluxdbCollector():
 
                 session_id = self._get_session_id(stream)
                 session_ids.append(session_id)
+                transcodevideo = "N/A"
+                transcodeaudio = "N/A"
+                videoCodec = "N/A"
 
                 if session_id in self.active_streams:
                     start_time = self.active_streams[session_id]['start_time']
@@ -284,15 +287,30 @@ class plexInfluxdbCollector():
                     full_title = stream.attrib['title']
 
                 if media_type != 'Music':
-                    resolution = stream.find('Media').attrib['videoResolution'] + 'p'
+                    resolution = stream.find('Media').attrib['videoResolution']
+                    transcodevideo = stream.find('TranscodeSession').attrib['videoDecision']
+                    transcodeaudio = stream.find('TranscodeSession').attrib['audioDecision']
+                    container = stream.find('Media').attrib['container']
+                    audioCodec = stream.find('Media').attrib['audioCodec']
+                    videoCodec = stream.find('Media').attrib['videoCodec']
+                    length_ms = stream.find('Media').attrib['duration']
                 else:
-                    resolution = stream.find('Media').attrib['bitrate'] + 'Kbps'
+                    resolution = stream.find('Media').attrib['bitrate'] + ' Kbps'
+                    container = stream.find('Media').attrib['container']
+                    audioCodec = stream.find('Media').attrib['audioCodec']
+                    length_ms = stream.find('Media').attrib['duration']
 
                 self.send_log('Title: {}'.format(full_title), 'debug')
                 self.send_log('Media Type: {}'.format(media_type), 'debug')
                 self.send_log('Session ID: {}'.format(session_id), 'debug')
                 self.send_log('Resolution: {}'.format(resolution), 'debug')
                 self.send_log('Duration: {}'.format(str(time.time() - start_time)), 'debug')
+                self.send_log('Transcode Video: {}'.format(transcodevideo), 'debug')
+                self.send_log('Transcode Audio: {}'.format(transcodeaudio), 'debug')
+                self.send_log('Container: {}'.format(container), 'debug')
+                self.send_log('Video Codec: {}'.format(videoCodec), 'debug')
+                self.send_log('Audio Codec: {}'.format(audioCodec), 'debug')
+                self.send_log('Length ms: {}'.format(length_ms), 'debug')
 
                 """
                 playing_points = [
@@ -325,7 +343,14 @@ class plexInfluxdbCollector():
                             'user': stream.find('User').attrib['title'],
                             'resolution': resolution,
                             'media_type': media_type,
-                            'duration': time.time() - start_time
+                            'duration': time.time() - start_time,
+                            'start_time': start_time,
+                            'transcode_video': transcodevideo,
+                            'transcode_audio': transcodeaudio,
+                            'container': container,
+                            'video_codec': videoCodec,
+                            'audio_codec': audioCodec,
+                            'length_ms': length_ms
                         },
                         'tags': {
                             'host': host,
