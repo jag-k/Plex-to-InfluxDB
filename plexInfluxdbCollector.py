@@ -283,22 +283,44 @@ class plexInfluxdbCollector():
                 # Build the title. TV and Music Have a root title plus episode/track name.  Movies don't
                 if 'grandparentTitle' in stream.attrib:
                     full_title = stream.attrib['grandparentTitle'] + ' - ' + stream.attrib['title']
+                    grandparentTitle = stream.attrib['grandparentTitle']
                 else:
                     full_title = stream.attrib['title']
+                    grandparentTitle = ""
+
+                if media_type != 'Movie' and media_type != 'Unknown':
+                    if 'parentTitle' in stream.attrib:
+                        parentTitle = stream.attrib['parentTitle']
+                    else:
+                        parentTitle = ""
+                    if 'parentIndex' in stream.attrib:
+                        parentIndex = int(stream.attrib['parentIndex'])
+                    else:
+                        parentIndex = 0
+                else:
+                    parentIndex = 0
+                    parentTitle = ""
 
                 if media_type != 'Music':
                     resolution = stream.find('Media').attrib['videoResolution']
                     transcodevideo = stream.find('TranscodeSession').attrib['videoDecision']
                     transcodeaudio = stream.find('TranscodeSession').attrib['audioDecision']
-                    container = stream.find('Media').attrib['container']
-                    audioCodec = stream.find('Media').attrib['audioCodec']
                     videoCodec = stream.find('Media').attrib['videoCodec']
-                    length_ms = int(stream.find('Media').attrib['duration'])
                 else:
                     resolution = stream.find('Media').attrib['bitrate'] + ' Kbps'
-                    container = stream.find('Media').attrib['container']
-                    audioCodec = stream.find('Media').attrib['audioCodec']
-                    length_ms = int(stream.find('Media').attrib['duration'])
+
+                audioCodec = stream.find('Media').attrib['audioCodec']
+                container = stream.find('Media').attrib['container']
+                length_ms = int(stream.find('Media').attrib['duration'])
+                state = stream.find['Player'].attrib['state']
+                platform = stream.find['Player'].attrib['platform']
+                position = int(stream.find['viewOffset'])
+                year = stream.attrib['year']
+                title = stream.attrib['title']
+                if 'index' in stream.attrib:
+                    index = int(stream.attrib['Index'])
+                else:
+                    index = 0
 
                 self.send_log('Title: {}'.format(full_title), 'debug')
                 self.send_log('Media Type: {}'.format(media_type), 'debug')
@@ -312,28 +334,6 @@ class plexInfluxdbCollector():
                 self.send_log('Audio Codec: {}'.format(audioCodec), 'debug')
                 self.send_log('Length ms: {}'.format(length_ms), 'debug')
 
-                """
-                playing_points = [
-                    {
-                        'measurement': 'now_playing',
-                        'fields': {
-                            'session_id': session_id
-                         },
-                        'tags': {
-                            'host': host,
-                            'player_address': stream.find('Player').attrib['address'],
-
-                            'media_type': media_type,
-                            'resolution': resolution,
-                            'user': stream.find('User').attrib['title'],
-                            'stream_title': full_title,
-                            'player': stream.find('Player').attrib['title'],
-                        }
-                    }
-                ]
-
-                # Working Layout
-                """
                 playing_points = [
                     {
                         'measurement': 'now_playing',
@@ -350,7 +350,16 @@ class plexInfluxdbCollector():
                             'container': container,
                             'video_codec': videoCodec,
                             'audio_codec': audioCodec,
-                            'length_ms': length_ms
+                            'length_ms': length_ms,
+                            'grandparentTitle': grandparentTitle,
+                            'parentTitle': parentTitle,
+                            'parentIndex': parentIndex,
+                            'title': title,
+                            'index': index,
+                            'year': year
+                            'state': state,
+                            'platform_ms': platform,
+                            'position': position
                         },
                         'tags': {
                             'host': host,
