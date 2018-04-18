@@ -279,7 +279,7 @@ class plexInfluxdbCollector():
                 length_ms = 0
                 grandparent_title = ""
                 parent_title = ""
-                parent_index = 0
+                parent_index = ""
                 title = ""
                 index = ""
                 year = ""
@@ -324,7 +324,7 @@ class plexInfluxdbCollector():
                         else:
                             parent_title = ""
                         if 'parentIndex' in stream.attrib:
-                            parent_index = int(stream.attrib['parentIndex'])
+                            parent_index = stream.attrib['parentIndex']
                         else:
                             parent_index = 0
                     else:
@@ -334,7 +334,7 @@ class plexInfluxdbCollector():
                     if media_type != 'Music':
                         resolution = stream.find('Media').attrib['videoResolution']
                         year = stream.attrib['year']
-                        if stream.find('TranscodeSession') != None:
+                        if stream.find('TranscodeSession') is not None:
                             transcode_video = stream.find('TranscodeSession').attrib['videoDecision']
                             transcode_audio = stream.find('TranscodeSession').attrib['audioDecision']
                         else:
@@ -345,19 +345,25 @@ class plexInfluxdbCollector():
                     else:
                         resolution = stream.find('Media').attrib['bitrate'] + ' Kbps'
 
+                    # Common fields
                     audio_codec = stream.find('Media').attrib['audioCodec']
                     container = stream.find('Media').attrib['container']
                     length_ms = int(stream.find('Media').attrib['duration'])
                     position = int(stream.attrib['viewOffset'])
-                    if position > 0 and length_ms >0:
-                        pos_percent = round(position / length_ms,4)
                     platform = stream.find('Player').attrib['platform']
                     title = stream.attrib['title']
-                    if 'index' in stream.attrib:
-                        index = int(stream.attrib['index'])
-                    else:
-                        index = 0
 
+                    # Calculate percent of total length played
+                    if position > 0 and length_ms >0:
+                        pos_percent = round(position / length_ms,4)
+
+                    # index is typically the episode number for TV, or track number for music
+                    if 'index' in stream.attrib:
+                        index = stream.attrib['index']
+                    else:
+                        index = ""
+
+                    # playing, paused, buffering
                     if 'state' in stream.find('Player').attrib:
                         player_state = stream.find('Player').attrib['state']
                     else:
