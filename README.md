@@ -1,9 +1,10 @@
-**Plex Data Collector For InfluxDB**
+**Plex to InfluxDB Extended**
 ------------------------------
+This project forked from the original, awesome [Plex-Data-Collector-For-InfluxDB by barrycarey](https://github.com/barrycarey/Plex-Data-Collector-For-InfluxDB).
 
 ![Screenshot](https://puu.sh/tarSA/aea875c453.png)
 
-This is a tool for collecting some basic info about your Plex server and sending it to InfluxDB.  This is ideal for displaying Plex specific information in a tool such as Grafana. 
+This is a tool for collecting info from your Plex server and sending it to InfluxDB.  This is ideal for displaying Plex specific information in a tool such as Grafana.
 
 ## Configuration within config.ini
 
@@ -44,9 +45,9 @@ Optionally, you can specify the --config argument to load the config file from a
 
 #### Requirements
 
-Python 3+
+*Python 3+*
 
-You will need the influxdb library installed to use this - [Found Here](https://github.com/influxdata/influxdb-python).  Usually this can be installed from the command line using:
+You will need the [*influxdb library*](https://github.com/influxdata/influxdb-python) installed to use this.  Typically this can be installed from the command line using:
 
 ```
 pip3 install influxdb
