@@ -231,6 +231,7 @@ class plexInfluxdbCollector():
         :param stream_data:
         :return:
         """
+        # TODO: Add width x height
 
         self.send_log('Processing Active Streams', 'info')
 
@@ -258,8 +259,38 @@ class plexInfluxdbCollector():
 
             for stream in streams:
 
+                # streamxml=ET.tostring(stream, encoding='utf8', method='xml')
+                # self.send_log(streamxml, 'debug')
                 session_id = self._get_session_id(stream)
                 session_ids.append(session_id)
+
+                #Initialize vars
+                full_title = "Unknown"
+                if stream.find('Player') is not None:
+                    player_title = stream.find('Player').attrib['title']
+                    user_title = stream.find('User').attrib['title']
+                else:
+                    player_title = "Unknown"
+                    user_title = "Unknown"
+                resolution = ""
+                container = ""
+                video_codec = ""
+                audio_codec = ""
+                length_ms = 0
+                grandparent_title = ""
+                parent_title = ""
+                parent_index = ""
+                title = ""
+                index = ""
+                year = ""
+                player_state = ""
+                platform = ""
+                position = 0
+                pos_percent = 0
+                transcode_video = ""
+                transcode_audio = ""
+                video_codec = ""
+                video_framerate = ""
 
                 if session_id in self.active_streams:
                     start_time = self.active_streams[session_id]['start_time']
@@ -277,55 +308,107 @@ class plexInfluxdbCollector():
                 else:
                     media_type = 'Unknown'
 
-                # Build the title. TV and Music Have a root title plus episode/track name.  Movies don't
-                if 'grandparentTitle' in stream.attrib:
-                    full_title = stream.attrib['grandparentTitle'] + ' - ' + stream.attrib['title']
-                else:
-                    full_title = stream.attrib['title']
+                # Don't error out on unknown stream types
+                if media_type != 'Unknown':
+                    # Build the title. TV and Music Have a root title plus episode/track name.  Movies don't
+                    if 'grandparentTitle' in stream.attrib:
+                        full_title = stream.attrib['grandparentTitle'] + ' - ' + stream.attrib['title']
+                        grandparent_title = stream.attrib['grandparentTitle']
+                    else:
+                        full_title = stream.attrib['title']
+                        grandparent_title = ""
 
-                if media_type != 'Music':
-                    resolution = stream.find('Media').attrib['videoResolution'] + 'p'
-                else:
-                    resolution = stream.find('Media').attrib['bitrate'] + 'Kbps'
+                    if media_type != 'Movie' and media_type != 'Unknown':
+                        if 'parentTitle' in stream.attrib:
+                            parent_title = stream.attrib['parentTitle']
+                        else:
+                            parent_title = ""
+                        if 'parentIndex' in stream.attrib:
+                            parent_index = stream.attrib['parentIndex']
+                        else:
+                            parent_index = 0
+                    else:
+                        parent_index = 0
+                        parent_title = ""
+
+                    if media_type != 'Music':
+                        resolution = stream.find('Media').attrib['videoResolution']
+                        year = stream.attrib['year']
+                        if stream.find('TranscodeSession') is not None:
+                            transcode_video = stream.find('TranscodeSession').attrib['videoDecision']
+                            transcode_audio = stream.find('TranscodeSession').attrib['audioDecision']
+                        else:
+                            transcode_video = "DirectPlay"
+                            transcode_audio = "DirectPlay"
+                        video_framerate = stream.find('Media').attrib['videoFrameRate']
+                        video_codec = stream.find('Media').attrib['videoCodec']
+                    else:
+                        resolution = stream.find('Media').attrib['bitrate'] + ' Kbps'
+
+                    # Common fields
+                    audio_codec = stream.find('Media').attrib['audioCodec']
+                    container = stream.find('Media').attrib['container']
+                    length_ms = int(stream.find('Media').attrib['duration'])
+                    position = int(stream.attrib['viewOffset'])
+                    platform = stream.find('Player').attrib['platform']
+                    title = stream.attrib['title']
+
+                    # Calculate percent of total length played
+                    if position > 0 and length_ms >0:
+                        pos_percent = round(position / length_ms,4)
+
+                    # index is typically the episode number for TV, or track number for music
+                    if 'index' in stream.attrib:
+                        index = stream.attrib['index']
+                    else:
+                        index = ""
+
+                    # playing, paused, buffering
+                    if 'state' in stream.find('Player').attrib:
+                        player_state = stream.find('Player').attrib['state']
+                    else:
+                        player_state = "Unavailable"
 
                 self.send_log('Title: {}'.format(full_title), 'debug')
                 self.send_log('Media Type: {}'.format(media_type), 'debug')
                 self.send_log('Session ID: {}'.format(session_id), 'debug')
                 self.send_log('Resolution: {}'.format(resolution), 'debug')
                 self.send_log('Duration: {}'.format(str(time.time() - start_time)), 'debug')
+                self.send_log('Transcode Video: {}'.format(transcode_video), 'debug')
+                self.send_log('Transcode Audio: {}'.format(transcode_audio), 'debug')
+                self.send_log('Container: {}'.format(container), 'debug')
+                self.send_log('Video Codec: {}'.format(video_codec), 'debug')
+                self.send_log('Audio Codec: {}'.format(audio_codec), 'debug')
+                self.send_log('Length ms: {}'.format(length_ms), 'debug')
 
-                """
-                playing_points = [
-                    {
-                        'measurement': 'now_playing',
-                        'fields': {
-                            'session_id': session_id
-                         },
-                        'tags': {
-                            'host': host,
-                            'player_address': stream.find('Player').attrib['address'],
-
-                            'media_type': media_type,
-                            'resolution': resolution,
-                            'user': stream.find('User').attrib['title'],
-                            'stream_title': full_title,
-                            'player': stream.find('Player').attrib['title'],
-                        }
-                    }
-                ]
-
-                # Working Layout
-                """
                 playing_points = [
                     {
                         'measurement': 'now_playing',
                         'fields': {
                             'stream_title': full_title,
-                            'player': stream.find('Player').attrib['title'],
-                            'user': stream.find('User').attrib['title'],
+                            'player': player_title,
+                            'user': user_title,
                             'resolution': resolution,
                             'media_type': media_type,
-                            'duration': time.time() - start_time
+                            'duration': time.time() - start_time,
+                            'start_time': start_time,
+                            'transcode_video': transcode_video,
+                            'transcode_audio': transcode_audio,
+                            'container': container,
+                            'video_codec': video_codec,
+                            'audio_codec': audio_codec,
+                            'length_ms': length_ms,
+                            'grandparent_title': grandparent_title,
+                            'parent_title': parent_title,
+                            'parent_index': parent_index,
+                            'title': title,
+                            'index': index,
+                            'year': year,
+                            'status': player_state,
+                            'platform': platform,
+                            'position_ms': position,
+                            'pos_percent': pos_percent,
+                            'video_framerate': video_framerate
                         },
                         'tags': {
                             'host': host,
