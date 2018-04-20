@@ -307,12 +307,12 @@ class plexInfluxdbCollector():
                         full_title = stream.attrib['title']
                         grandparent_title = ""
 
-                    if media_type == 'TV Show':
+                    if media_type == 'TV Show' or media_type == 'Music':
                         if 'parentTitle' in stream.attrib:
                             parent_title = stream.attrib['parentTitle']
                         else:
                             parent_title = ""
-                        if 'parentIndex' in stream.attrib:
+                        if 'parentIndex' in stream.attrib and media_type == 'TV Show':
                             parent_index = stream.attrib['parentIndex']
                         else:
                             parent_index = ""
