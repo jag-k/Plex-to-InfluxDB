@@ -236,26 +236,14 @@ class plexInfluxdbCollector():
         self.send_log('Processing Active Streams', 'info')
 
         combined_streams = 0
+
         session_ids = []  # Active Session IDs for this run
 
         for host, streams in stream_data.items():
 
             combined_streams += len(streams)
-
-            # Record total streams
-            total_stream_points = [
-                {
-                    'measurement': 'active_streams',
-                    'fields': {
-                        'active_streams': len(streams)
-                    },
-                    'tags': {
-                        'host': host
-                    }
-                }
-            ]
-
-            self.write_influx_data(total_stream_points)
+            combined_video_transcodes = 0
+            combined_audio_transcodes = 0
 
             for stream in streams:
 
@@ -289,6 +277,7 @@ class plexInfluxdbCollector():
                 pos_percent = 0
                 transcode_video = ""
                 transcode_audio = ""
+                transcode_summary = ""
                 video_codec = ""
                 video_framerate = ""
 
@@ -318,7 +307,7 @@ class plexInfluxdbCollector():
                         full_title = stream.attrib['title']
                         grandparent_title = ""
 
-                    if media_type != 'Movie' and media_type != 'Unknown':
+                    if media_type == 'TV Show':
                         if 'parentTitle' in stream.attrib:
                             parent_title = stream.attrib['parentTitle']
                         else:
@@ -326,20 +315,24 @@ class plexInfluxdbCollector():
                         if 'parentIndex' in stream.attrib:
                             parent_index = stream.attrib['parentIndex']
                         else:
-                            parent_index = 0
+                            parent_index = ""
                     else:
-                        parent_index = 0
+                        parent_index = ""
                         parent_title = ""
 
                     if media_type != 'Music':
                         resolution = stream.find('Media').attrib['videoResolution']
                         year = stream.attrib['year']
+                        transcode_summary = "V: No "
                         if stream.find('TranscodeSession') is not None:
-                            transcode_video = stream.find('TranscodeSession').attrib['videoDecision']
-                            transcode_audio = stream.find('TranscodeSession').attrib['audioDecision']
+                            if stream.find('TranscodeSession').attrib['videoDecision'] == 'transcode':
+                                transcode_video = "Transcoding"
+                                combined_video_transcodes += 1
+                                transcode_summary = "V: Yes "
+                            else:
+                                transcode_video = "DirectStream"
                         else:
                             transcode_video = "DirectPlay"
-                            transcode_audio = "DirectPlay"
                         video_framerate = stream.find('Media').attrib['videoFrameRate']
                         video_codec = stream.find('Media').attrib['videoCodec']
                     else:
@@ -347,6 +340,18 @@ class plexInfluxdbCollector():
 
                     # Common fields
                     audio_codec = stream.find('Media').attrib['audioCodec']
+                    if stream.find('TranscodeSession') is not None:
+                        if stream.find('TranscodeSession').attrib['audioDecision'] == 'transcode':
+                            transcode_audio = "Transcoding"
+                            combined_audio_transcodes += 1
+                            transcode_summary += "A: Yes"
+                        else:
+                            transcode_audio = "DirectStream"
+                            transcode_summary += "A: No"
+                    else:
+                        transcode_audio = "DirectPlay"
+                        transcode_summary += "A: No"
+
                     container = stream.find('Media').attrib['container']
                     length_ms = int(stream.find('Media').attrib['duration'])
                     position = int(stream.attrib['viewOffset'])
@@ -394,6 +399,7 @@ class plexInfluxdbCollector():
                             'start_time': start_time,
                             'transcode_video': transcode_video,
                             'transcode_audio': transcode_audio,
+                            'transcode_summary': transcode_summary,
                             'container': container,
                             'video_codec': video_codec,
                             'audio_codec': audio_codec,
@@ -420,6 +426,25 @@ class plexInfluxdbCollector():
 
                 self.write_influx_data(playing_points)
 
+            # Record total streams for this host
+            total_stream_points = [
+                {
+                    'measurement': 'active_streams',
+                    'fields': {
+                        'active_streams': len(streams),
+                        'video_transcodes': combined_video_transcodes,
+                        'audio_transcodes': combined_audio_transcodes
+                    },
+                    'tags': {
+                        'host': host
+                    }
+                }
+            ]
+            self.write_influx_data(total_stream_points)
+
+
+
+        # Report total streams across all hosts
         if self._report_combined_streams:
             combined_stream_points = [
                 {
