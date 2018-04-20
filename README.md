@@ -68,8 +68,9 @@ pip3 install influxdb
 |resolution         | Video resolution (e.g. 4k, 1080p, 720p) for movies and TV. Audio bitrate for music.                   |
 |video_codec        | Codec for video stream (e.g. h264, h265, mpeg)                                                        |
 |audio_codec        | Codec for audio stream                                                                                |
-|transcode_video    | DirectPlay, Copy (container remux usually because audio is being transcoded or client doesn't natively support container), or Transcode|
+|transcode_video    | DirectPlay, DirectStream (container remux usually because audio is being transcoded or client doesn't natively support container), or Transcoding|
 |transcode_audio    | DirectPlay, Copy, or Transcode                                                                        |
+|transcode_summary  | Reflects transcoding status of both video and audio (or just audio in the case of music)              |
 |video_framerate    | Frame rate for video stream. Blank for music                                                          |
 |length_ms          | Length of track, epsidode, or movie in milliseconds                                                   |
 |player             | Device name of client playing the media                                                               |
