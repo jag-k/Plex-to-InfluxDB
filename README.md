@@ -6,6 +6,10 @@ This project forked from the original, awesome [Plex-Data-Collector-For-InfluxDB
 
 This is a tool for collecting info from your Plex server and sending it to InfluxDB.  This is ideal for displaying Plex specific information in a tool such as Grafana.
 
+**Docker**
+
+You can find a docker image for running this script on [Docker Hub](https://hub.docker.com/r/kurzondax/plex-to-influx-extended/)
+
 ## Configuration within config.ini
 
 #### GENERAL
