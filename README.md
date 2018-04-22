@@ -42,6 +42,7 @@ Enter your desired information in config.ini and run plexInfluxdbCollector.py
 
 Optionally, you can specify the --config argument to load the config file from a different location.  
 
+A Docker image is also available here: https://hub.docker.com/r/kurzondax/plex-to-influx-extended/
 
 #### Requirements
 
@@ -98,3 +99,9 @@ If you are using Grafana to generate a dashboard, the start_time field will appe
 |session_id         |Plex internal ID number for playback session                                                           |
 
 
+# Version History
+
+|Version            |Description                                                                                            |
+|:------------------|:------------------------------------------------------------------------------------------------------|
+|v0.1.1             | Fixed crash when Plex does not provide a year for an active stream                                    |
+|v0.1               | Initial release                                                                                       |
