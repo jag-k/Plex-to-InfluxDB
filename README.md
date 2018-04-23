@@ -10,6 +10,12 @@ This is a tool for collecting info from your Plex server and sending it to Influ
 
 You can find a docker image for running this script on [Docker Hub](https://hub.docker.com/r/kurzondax/plex-to-influx-extended/)
 
+
+## Known Issues
+* Any libraries containing TV shows that aren't named "TV Shows" won't return season or episode counts for the library statistics.  The title "TV Shows" was hard coded in to the original python script that I forked this from.  This can be fixed so that episodes will be counted for any library containing TV shows, but it may be a few days before I'll have time to work on it.
+* Currently, the python script assumes that the Plex server is always listening on port 32400.  If your server uses a different port, no data will be collected.  I will be adding code to recognize IPaddress:Port from the config file.
+* Exceedingly large libraries may cause the script to bog down when updating total library stats.  I will be adding a new value to the config.ini file that will allow specifying a separate interval for collecting library stats.
+
 ## Configuration within config.ini
 
 #### GENERAL
