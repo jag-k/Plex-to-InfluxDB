@@ -32,6 +32,7 @@ class plexInfluxdbCollector():
         self.active_streams = {}  # Store active streams so we can track duration
         self._report_combined_streams = True # TODO Move to config
         self.delay = self.config.delay
+        self.librarydelay = self.config.librarydelay
         self.influx_client = InfluxDBClient(
             self.config.influx_address,
             self.config.influx_port,
@@ -590,12 +591,15 @@ class plexInfluxdbCollector():
 
     def run(self):
 
-        self.send_log('Starting Monitoring Loop', 'info')
-
+        self.send_log('Starting Monitoring Loop with delay {} and librarydelay {}'.format(self.delay, self.librarydelay), 'info')
+        sleeptime = self.librarydelay
         while True:
-            self.get_library_data()
+            if sleeptime >= self.librarydelay:
+                self.get_library_data()
+                sleeptime = 0
             self.get_active_streams()
             time.sleep(self.delay)
+            sleeptime += self.delay
 
 
 class configManager():
@@ -632,6 +636,7 @@ class configManager():
 
         # General
         self.delay = self.config['GENERAL'].getint('Delay', fallback=2)
+        self.librarydelay = self.config['GENERAL'].getint('LibraryDelay', fallback=1800)
         if not self.silent:
             self.output = self.config['GENERAL'].getboolean('Output', fallback=True)
         else:
