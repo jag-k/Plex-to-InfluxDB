@@ -500,27 +500,32 @@ class plexInfluxdbCollector():
 
             host_libs = []
             if len(libs) > 0:
+                """
                 lib_keys = [lib.attrib['key'] for lib in libs]  # TODO probably should catch exception here
                 self.send_log('Scanning libraries on server {} with keys {}'.format(server, ','.join(lib_keys)), 'info')
-
-                for key in lib_keys:
-                    req_uri = 'http://{}:32400/library/sections/{}/all'.format(server, key)
-                    self.send_log('Attempting to get library {} with URL: {}'.format(key, req_uri), 'info')
+                """
+                for lib in libs:
+                    libkey = lib.attrib['key']
+                    libtype = lib.attrib['type']
+                    req_uri = 'http://{}:32400/library/sections/{}/all'.format(server, libkey)
+                    self.send_log('Attempting to get library {} of type {} with URL: {}'.format(libkey, libtype, req_uri), 'info')
                     req = Request(req_uri)
                     req = self._set_default_headers(req)
 
                     try:
                         result = urlopen(req).read().decode('utf-8')
                     except URLError as e:
-                        self.send_log('Failed to get library {}.  {}'.format(key, e), 'error')
+                        self.send_log('Failed to get library {}.  {}'.format(libkey, e), 'error')
                         continue
+
+                    self.send_log(result, 'debug')
 
                     lib_root = ET.fromstring(result)
                     host_lib = {
                         'name': lib_root.attrib['librarySectionTitle'],
                         'items': len(lib_root)
                     }
-                    if lib_root.attrib['librarySectionTitle'] == "TV Shows":
+                    if libtype == "show":
                         host_lib['episodes'] = 0
                         host_lib['seasons'] = 0
                         for show in lib_root:
