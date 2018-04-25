@@ -32,6 +32,7 @@ class plexInfluxdbCollector():
         self.active_streams = {}  # Store active streams so we can track duration
         self._report_combined_streams = True # TODO Move to config
         self.delay = self.config.delay
+        self.librarydelay = self.config.librarydelay
         self.influx_client = InfluxDBClient(
             self.config.influx_address,
             self.config.influx_port,
@@ -500,27 +501,32 @@ class plexInfluxdbCollector():
 
             host_libs = []
             if len(libs) > 0:
+                """
                 lib_keys = [lib.attrib['key'] for lib in libs]  # TODO probably should catch exception here
                 self.send_log('Scanning libraries on server {} with keys {}'.format(server, ','.join(lib_keys)), 'info')
-
-                for key in lib_keys:
-                    req_uri = 'http://{}:32400/library/sections/{}/all'.format(server, key)
-                    self.send_log('Attempting to get library {} with URL: {}'.format(key, req_uri), 'info')
+                """
+                for lib in libs:
+                    libkey = lib.attrib['key']
+                    libtype = lib.attrib['type']
+                    req_uri = 'http://{}:32400/library/sections/{}/all'.format(server, libkey)
+                    self.send_log('Attempting to get library {} of type {} with URL: {}'.format(libkey, libtype, req_uri), 'info')
                     req = Request(req_uri)
                     req = self._set_default_headers(req)
 
                     try:
                         result = urlopen(req).read().decode('utf-8')
                     except URLError as e:
-                        self.send_log('Failed to get library {}.  {}'.format(key, e), 'error')
+                        self.send_log('Failed to get library {}.  {}'.format(libkey, e), 'error')
                         continue
+
+                    self.send_log(result, 'debug')
 
                     lib_root = ET.fromstring(result)
                     host_lib = {
                         'name': lib_root.attrib['librarySectionTitle'],
                         'items': len(lib_root)
                     }
-                    if lib_root.attrib['librarySectionTitle'] == "TV Shows":
+                    if libtype == "show":
                         host_lib['episodes'] = 0
                         host_lib['seasons'] = 0
                         for show in lib_root:
@@ -585,12 +591,15 @@ class plexInfluxdbCollector():
 
     def run(self):
 
-        self.send_log('Starting Monitoring Loop', 'info')
-
+        self.send_log('Starting Monitoring Loop with delay {} and librarydelay {}'.format(self.delay, self.librarydelay), 'info')
+        sleeptime = self.librarydelay
         while True:
-            self.get_library_data()
+            if sleeptime >= self.librarydelay:
+                self.get_library_data()
+                sleeptime = 0
             self.get_active_streams()
             time.sleep(self.delay)
+            sleeptime += self.delay
 
 
 class configManager():
@@ -627,6 +636,7 @@ class configManager():
 
         # General
         self.delay = self.config['GENERAL'].getint('Delay', fallback=2)
+        self.librarydelay = self.config['GENERAL'].getint('LibraryDelay', fallback=1800)
         if not self.silent:
             self.output = self.config['GENERAL'].getboolean('Output', fallback=True)
         else:
