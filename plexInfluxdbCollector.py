@@ -275,7 +275,7 @@ class plexInfluxdbCollector():
                 player_state = ""
                 platform = ""
                 position = 0
-                pos_percent = 0
+                pos_percent = 0.0
                 transcode_video = ""
                 transcode_audio = ""
                 transcode_summary = ""
