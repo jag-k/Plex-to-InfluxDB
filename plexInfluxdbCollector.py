@@ -275,7 +275,7 @@ class plexInfluxdbCollector():
                 player_state = ""
                 platform = ""
                 position = 0
-                pos_percent = 0
+                pos_percent = 0.0
                 transcode_video = ""
                 transcode_audio = ""
                 transcode_summary = ""
@@ -387,6 +387,8 @@ class plexInfluxdbCollector():
                 self.send_log('Video Codec: {}'.format(video_codec), 'debug')
                 self.send_log('Audio Codec: {}'.format(audio_codec), 'debug')
                 self.send_log('Length ms: {}'.format(length_ms), 'debug')
+                self.send_log('Position: {}'.format(position), 'debug')
+                self.send_log('Pos Percent: {}'.format(pos_percent), 'debug')
 
                 playing_points = [
                     {
@@ -519,7 +521,7 @@ class plexInfluxdbCollector():
                         self.send_log('Failed to get library {}.  {}'.format(libkey, e), 'error')
                         continue
 
-                    self.send_log(result, 'debug')
+                    # self.send_log(result, 'debug')
 
                     lib_root = ET.fromstring(result)
                     host_lib = {
