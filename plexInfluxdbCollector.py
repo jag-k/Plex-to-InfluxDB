@@ -355,14 +355,14 @@ class plexInfluxdbCollector():
                         transcode_summary += "A: No"
 
                     container = stream.find('Media').attrib['container']
-                    length_ms = int(stream.find('Media').attrib['duration'])
-                    position = int(stream.attrib['viewOffset'])
+                    length_ms = stream.find('Media').attrib['duration']
+                    position = stream.attrib['viewOffset']
                     platform = stream.find('Player').attrib['platform']
                     title = stream.attrib['title']
 
                     # Calculate percent of total length played
-                    if position > 0 and length_ms >0:
-                        pos_percent = round(position / length_ms,4)
+                    if int(position) > 0 and int(length_ms) >0:
+                        pos_percent = round(int(position) / int(length_ms), 4)
 
                     # index is typically the episode number for TV, or track number for music
                     if 'index' in stream.attrib:
@@ -407,7 +407,7 @@ class plexInfluxdbCollector():
                             'container': container,
                             'video_codec': video_codec,
                             'audio_codec': audio_codec,
-                            'length_ms': length_ms,
+                            'length_ms': int(length_ms),
                             'grandparent_title': grandparent_title,
                             'parent_title': parent_title,
                             'parent_index': parent_index,
