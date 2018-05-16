@@ -113,5 +113,6 @@ If you are using Grafana to generate a dashboard, the start_time field will appe
 
 |Version            |Description                                                                                            |
 |:------------------|:------------------------------------------------------------------------------------------------------|
+|v0.1.2             | Fixed issue with TV Shows not being properly written to Now Playing                                   |
 |v0.1.1             | Fixed crash when Plex does not provide a year for an active stream                                    |
 |v0.1               | Initial release                                                                                       |
