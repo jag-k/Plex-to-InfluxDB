@@ -113,6 +113,9 @@ If you are using Grafana to generate a dashboard, the start_time field will appe
 
 |Version            |Description                                                                                            |
 |:------------------|:------------------------------------------------------------------------------------------------------|
-|v0.1.2             | Fixed issue with TV Shows not being properly written to Now Playing                                   |
+|v0.1.3             | Fixed issue with TV Shows not being properly written to Now Playing                                   |
+|v0.1.2             | Stats for libraries containing TV shows will now be gathered regardless of the actual name of the library. Previously, season and episode stats would only be gathered if the library was specifically named "TV Shows".
+|                   |Collecting of library stats will now only be performed every 30 minutes by default. This should lessen impact of extremely large libraries causing delays in now_playing and active_streams stats being updated. Eventually, I'd like to move the library stat collection out to a separate thread.
+|                   |Added new LibraryDelay option to config.ini under GENERAL section to allow specifying how long (in seconds) to wait between gathering library stats. If the value is missing from the INI, a default value of 1800 seconds (30 minutes) will be used.
 |v0.1.1             | Fixed crash when Plex does not provide a year for an active stream                                    |
 |v0.1               | Initial release                                                                                       |
