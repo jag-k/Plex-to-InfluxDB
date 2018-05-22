@@ -323,7 +323,7 @@ class plexInfluxdbCollector():
 
                     if media_type != 'Music':
                         resolution = stream.find('Media').attrib['videoResolution']
-                        if stream.attrib['year'] is not None:
+                        if 'year' in stream.attrib:
                             year = stream.attrib['year']
                         transcode_summary = "V: No "
                         if stream.find('TranscodeSession') is not None:
