@@ -1,12 +1,12 @@
-FROM python
-LABEL org.opencontainers.image.authors="SvenDowideit@home.org.au"
+FROM python:alpine3.10
+LABEL org.opencontainers.image.authors="jag.konon@gmail.com"
 
-VOLUME /src/
-COPY plexcollector.py requirements.txt /src/
-COPY config.ini /src/config.example.ini
-ADD plexcollector /src/plexcollector
 WORKDIR /src
-
+COPY requirements.txt /src/
 RUN pip install -r requirements.txt
+
+COPY plexcollector.py /src/
+COPY plexcollector/ /src/plexcollector
+#COPY config.ini /src/config.example.ini
 
 CMD ["python3", "-u", "/src/plexcollector.py"]
