@@ -186,7 +186,6 @@ class PlexInfluxdbCollector:
                     self.active_streams.setdefault(session_id, {})['start_time'] = start_time
 
                 media_type = MEDIA_TYPES.get(stream.type, 'Unknown')
-                print(media_type)
 
                 data, video, audio = StreamData().stream_processor(stream)
 
@@ -349,7 +348,6 @@ class PlexInfluxdbCollector:
         """
         Breakdown the provided library data and format for InfluxDB
         """
-        print(lib_data)
         log.info('Processing Library Data')
 
         for host, data in lib_data.items():
