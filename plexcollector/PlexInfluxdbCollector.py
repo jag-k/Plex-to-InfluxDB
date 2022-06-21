@@ -1,26 +1,32 @@
 import base64
+import dataclasses
 import json
 import sys
 import time
+from typing import List, Dict
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+import plexapi.base
+import plexapi.library
 import requests
+import urllib3.exceptions
 from influxdb import InfluxDBClient
 from influxdb.exceptions import InfluxDBClientError, InfluxDBServerError
 from plexapi.server import PlexServer
 from requests import ConnectTimeout
 
 from plexcollector.common import log
+from plexcollector.common.sctructures import StreamData, MEDIA_TYPES, \
+    MEDIA_TYPE
 from plexcollector.config import config
+
 
 # TODO - Update readme for PMS SSL
 class PlexInfluxdbCollector:
-
     def __init__(self, single_run=False):
-
         self.server_addresses = config.plex_server_addresses
-        self.plex_servers = []
+        self.plex_servers: List[PlexServer] = []
         self.logger = log
         self.token = None
         self.single_run = single_run
@@ -30,7 +36,6 @@ class PlexInfluxdbCollector:
 
         # Prevents console spam if verify ssl is disabled
         if not config.plex_verify_ssl:
-            import urllib3
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
         self._build_server_list()
@@ -41,13 +46,20 @@ class PlexInfluxdbCollector:
         :return:
         """
         for server in self.server_addresses:
-            base_url = '{}://{}:32400'.format(config.conn_security, server)
+            base_url = config.url(server)
             session = requests.Session()
             session.verify = config.plex_verify_ssl
-            api_conn = PlexServer(base_url, self.get_auth_token(config.plex_user, config.plex_password), session=session)
+            api_conn = PlexServer(
+                base_url,
+                self.get_auth_token(
+                    config.plex_user, config.plex_password
+                ),
+                # session=session
+            )
             self.plex_servers.append(api_conn)
 
-    def _get_influx_connection(self):
+    @staticmethod
+    def _get_influx_connection():
         """
         Create an InfluxDB connection and test to make sure it works.
         We test with the get all users command.  If the address is bad it fails
@@ -56,8 +68,8 @@ class PlexInfluxdbCollector:
         """
         # TODO - Check what permissions are actually needed to make this work
         influx = InfluxDBClient(
-            config.influx_address,
-            config.influx_port,
+            host=config.influx_address,
+            port=config.influx_port,
             database=config.influx_database,
             ssl=config.influx_ssl,
             verify_ssl=config.influx_verify_ssl,
@@ -67,7 +79,7 @@ class PlexInfluxdbCollector:
         )
         try:
             log.debug('Testing connection to InfluxDb using provided credentials')
-            influx.get_list_users() # TODO - Find better way to test connection and permissions
+            influx.get_list_users()  # TODO - Find better way to test connection and permissions
             log.debug('Successful connection to InfluxDb')
         except (ConnectTimeout, InfluxDBClientError) as e:
             if isinstance(e, ConnectTimeout):
@@ -91,9 +103,8 @@ class PlexInfluxdbCollector:
 
         auth_string = '{}:{}'.format(username, password)
         base_auth = base64.encodebytes(bytes(auth_string, 'utf-8'))
-        req = Request('https://plex.tv/users/sign_in.json')
-        req = self._set_default_headers(req)
-        req.add_header('Authorization', 'Basic {}'.format(base_auth[:-1].decode('utf-8')))
+        req = self.request('https://plex.tv/users/sign_in.json')
+        req.add_header('Authorization', f'Basic {base_auth[:-1].decode("utf-8")}')
 
         try:
             result = urlopen(req, data=b'').read()
@@ -117,43 +128,34 @@ class PlexInfluxdbCollector:
             print('Something Broke \n We got a valid response but for some reason there\'s no auth token')
             sys.exit(1)
 
-
-
-    def _set_default_headers(self, req):
+    def request(self, url: str) -> Request:
         """
-        Sets the default headers need for a request
-        :param req:
-        :return: request
+        Make a request to plex.tv
         """
+        return Request(url, headers=self._default_headers)
 
-        log.debug('Adding Request Headers')
-
+    @property
+    def _default_headers(self):
         headers = {
             'X-Plex-Client-Identifier': 'Plex InfluxDB Collector',
             'X-Plex-Product': 'Plex InfluxDB Collector',
             'X-Plex-Version': '1',
-            'X-Plex-Token': self.token
         }
-
-        for k, v in headers.items():
-            if k == 'X-Plex-Token' and not self.token:  # Don't add token if we don't have it yet
-                continue
-
-            req.add_header(k, v)
-
-        return req
+        if self.token:
+            headers['X-Plex-Token'] = self.token
+        return headers
 
     def get_active_streams(self):
-
         log.info('Attempting to get active sessions')
-        active_streams = {}
-        for server in self.plex_servers:
-            active_sessions = server.sessions()
-            active_streams[server._baseurl] = active_sessions
+
+        active_streams = {
+            server._baseurl: server.sessions()
+            for server in self.plex_servers
+        }
 
         self._process_active_streams(active_streams)
 
-    def _process_active_streams(self, stream_data):
+    def _process_active_streams(self, stream_data: Dict[str, List[MEDIA_TYPE]]):
         """
         Take an object of stream data and create Influx JSON data
         :param stream_data:
@@ -168,68 +170,59 @@ class PlexInfluxdbCollector:
         for host, streams in stream_data.items():
 
             combined_streams += len(streams)
-
-            # Record total streams
-            total_stream_points = [
-                {
-                    'measurement': 'active_streams',
-                    'fields': {
-                        'active_streams': len(streams)
-                    },
-                    'tags': {
-                        'host': host
-                    }
-                }
-            ]
-
-            self.write_influx_data(total_stream_points)
+            combined_video_transcodes = 0
+            combined_audio_transcodes = 0
 
             for stream in streams:
                 player = stream.players[0]
                 user = stream.usernames[0]
                 session_id = stream.session[0].id
-                transcode = stream.transcodeSessions if stream.transcodeSessions else None
                 session_ids.append(session_id)
 
                 if session_id in self.active_streams:
                     start_time = self.active_streams[session_id]['start_time']
                 else:
                     start_time = time.time()
-                    self.active_streams[session_id] = {}
-                    self.active_streams[session_id]['start_time'] = start_time
+                    self.active_streams.setdefault(session_id, {})['start_time'] = start_time
 
-                if stream.type == 'movie':
-                    media_type = 'Movie'
-                elif stream.type == 'episode':
-                    media_type = 'TV Show'
-                elif stream.type == 'track':
-                    media_type = 'Music'
-                else:
-                    media_type = 'Unknown'
+                media_type = MEDIA_TYPES.get(stream.type, 'Unknown')
+                print(media_type)
 
-                # Build the title. TV and Music Have a root title plus episode/track name.  Movies don't
-                if hasattr(stream, 'grandparentTitle'):
-                    full_title = stream.grandparentTitle + ' - ' + stream.title
-                else:
-                    full_title = stream.title
+                data, video, audio = StreamData().stream_processor(stream)
 
-                if media_type != 'Music':
-                    resolution = stream.media[0].videoResolution
-                else:
-                    resolution = str(stream.media[0].bitrate) + 'Kbps'
+                # playing, paused, buffering
+                player_state = getattr(player, 'state', 'Unavailable')
+
+                combined_video_transcodes += video
+                combined_audio_transcodes += audio
+
+                log.debug(f'Title: {data.full_title}')
+                log.debug(f'Media Type: {media_type}')
+                log.debug(f'Session ID: {session_id}')
+                log.debug(f'Resolution: {data.resolution}')
+                log.debug(f'Duration: {time.time() - start_time}')
+                log.debug(f'Transcode Video: {data.transcode_video}')
+                log.debug(f'Transcode Audio: {data.transcode_audio}')
+                log.debug(f'Container: {data.container}')
+                log.debug(f'Video Codec: {data.video_codec}')
+                log.debug(f'Audio Codec: {data.audio_codec}')
+                log.debug(f'Length ms: {data.length_ms}')
+                log.debug(f'Position: {data.position}')
+                log.debug(f'Pos Percent: {data.pos_percent}')
 
                 playing_points = [
                     {
                         'measurement': 'now_playing',
                         'fields': {
-                            'stream_title': full_title,
                             'player': player.title,
                             'state': player.state,
                             'user': user,
-                            'resolution': resolution,
                             'media_type': media_type,
-                            'playback': 'transcode' if transcode else 'direct',
                             'duration': time.time() - start_time,
+                            'start_time': start_time,
+                            'platform': player.platform,
+                            'player_state': player_state,
+                            **dataclasses.asdict(data)
                         },
                         'tags': {
                             'host': host,
@@ -241,6 +234,23 @@ class PlexInfluxdbCollector:
 
                 self.write_influx_data(playing_points)
 
+            # Record total streams for this host
+            total_stream_points = [
+                {
+                    'measurement': 'active_streams',
+                    'fields': {
+                        'active_streams': len(streams),
+                        'video_transcodes': combined_video_transcodes,
+                        'audio_transcodes': combined_audio_transcodes
+                    },
+                    'tags': {
+                        'host': host
+                    }
+                }
+            ]
+            self.write_influx_data(total_stream_points)
+
+        # Report total streams across all hosts
         if config.report_combined:
             combined_stream_points = [
                 {
@@ -271,35 +281,36 @@ class PlexInfluxdbCollector:
             self.active_streams.pop(key)
 
     def get_library_data(self):
-
+        """
+        Get all library data for each provided server.
+        """
+        # TODO This might take ages in large libraries.  Add a separate delay for this check
         lib_data = {}
 
         for server in self.plex_servers:
-            libs = server.library.sections()
+            libs: List[plexapi.library.LibrarySection] = server.library.sections()
             log.info('We found {} libraries for server {}'.format(str(len(libs)), server))
             host_libs = []
             for lib in libs:
-                log.info('Adding data for library %s', lib.title)
                 host_lib = {
-                    'name': lib.title,
+                    'tags': {
+                        'lib_name': lib.title,
+                        'lib_type': lib.type,
+                    },
                     'items': len(lib.search())
                 }
 
-                if lib.title == 'TV Shows':
-                    log.info('Processing TV Shows.  This can take awhile for large libraries')
-                    seasons = 0
-                    episodes = 0
+                if lib.type == "show":
+                    host_lib['episodes'] = 0
+                    host_lib['seasons'] = 0
                     shows = lib.search()
                     for show in shows:
                         log.debug('Checking TV Show: %s', show.title)
-                        seasons += len(show.seasons())
-                        episodes += len(show.episodes())
-                    host_lib['episodes'] = episodes
-                    host_lib['seasons'] = seasons
+                        host_lib['episodes'] += len(show.seasons())
+                        host_lib['seasons'] += len(show.episodes())
 
                 host_libs.append(host_lib)
-
-            lib_data[server._baseurl] = host_libs
+            lib_data[server] = host_libs
 
         self._process_library_data(lib_data)
 
@@ -308,8 +319,6 @@ class PlexInfluxdbCollector:
         Build list of recently added
         :return:
         """
-
-        results = []
 
         for server in self.plex_servers:
             recent_list = []
@@ -334,15 +343,13 @@ class PlexInfluxdbCollector:
                 else:
                     data['fields']['title'] = item.title
 
-
                 self.write_influx_data([data])
-
 
     def _process_library_data(self, lib_data):
         """
         Breakdown the provided library data and format for InfluxDB
         """
-
+        print(lib_data)
         log.info('Processing Library Data')
 
         for host, data in lib_data.items():
@@ -358,8 +365,8 @@ class PlexInfluxdbCollector:
                         'measurement': 'libraries',
                         'fields': fields,
                         'tags': {
-                            'lib_name': lib['name'],
-                            'host': host
+                            'host': host,
+                            **lib['tags'],
                         }
                     }
                 ]

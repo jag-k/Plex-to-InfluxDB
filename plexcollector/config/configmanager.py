@@ -1,6 +1,7 @@
 import configparser
 import os
 import sys
+from typing import Tuple, Iterable
 
 import requests
 
@@ -26,34 +27,49 @@ class ConfigManager:
     def _load_config_values(self):
 
         # General
-        self.delay = self.config['GENERAL'].getint('Delay', fallback=2)
-        self.report_combined = self.config['GENERAL'].get('ReportCombined', fallback=True)
+        general = self.config['GENERAL']
+        self.delay = general.getint('Delay', fallback=2)
+        self.report_combined = general.getboolean('ReportCombined', fallback=True)
 
         # InfluxDB
-        self.influx_address = self.config['INFLUXDB']['Address']
-        self.influx_port = self.config['INFLUXDB'].getint('Port', fallback=8086)
-        self.influx_database = self.config['INFLUXDB'].get('Database', fallback='plex_data')
-        self.influx_ssl = self.config['INFLUXDB'].getboolean('SSL', fallback=False)
-        self.influx_verify_ssl = self.config['INFLUXDB'].getboolean('Verify_SSL', fallback=True)
-        self.influx_user = self.config['INFLUXDB'].get('Username', fallback='')
-        self.influx_password = self.config['INFLUXDB'].get('Password', fallback='', raw=True)
+        influx = self.config['INFLUXDB']
+        self.influx_address = influx['Address']
+        self.influx_port = influx.getint('Port', fallback=8086)
+        self.influx_database = influx.get('Database', fallback='plex_data')
+        self.influx_ssl = influx.getboolean('SSL', fallback=False)
+        self.influx_verify_ssl = influx.getboolean('Verify_SSL', fallback=True)
+        self.influx_user = influx.get('Username', fallback='')
+        self.influx_password = influx.get('Password', fallback='', raw=True)
 
         # Plex
-        self.plex_user = self.config['PLEX']['Username']
-        self.plex_password = self.config['PLEX'].get('Password', raw=True)
-        plex_https = self.config['PLEX'].getboolean('HTTPS', fallback=False)
+        plex = self.config['PLEX']
+        self.plex_user = plex['Username']
+        self.plex_password = plex.get('Password', raw=True)
+        plex_https = plex.getboolean('HTTPS', fallback=False)
         self.conn_security = 'https' if plex_https else 'http'
-        self.plex_verify_ssl = self.config['PLEX'].getboolean('Verify_SSL', fallback=False)
-        servers = len(self.config['PLEX']['Servers'])
+        self.port = plex.getint('Port', fallback=32469 if plex_https else 32400)
+        self.plex_verify_ssl = plex.getboolean('Verify_SSL', fallback=False)
+        servers = len(plex['Servers'])
 
-        #Logging
+        # Logging
         self.logging_level = self.config['LOGGING']['Level'].upper()
 
         if servers:
-            self.plex_server_addresses = self.config['PLEX']['Servers'].replace(' ', '').split(',')
+            self.plex_server_addresses = plex['Servers'].replace(' ', '').split(',')
         else:
-            print('ERROR: No Plex Servers Provided.  Aborting')
+            print('ERROR: No Plex Servers Provided.\nAborting!')
             sys.exit(1)
+
+    def url(self, server):
+        return '{}://{}:{}'.format(self.conn_security, server, self.port)
+
+    @property
+    def urls(self):
+        return map(self.url, self.plex_server_addresses)
+
+    @property
+    def servers_url(self) -> Iterable[Tuple[str, str]]:
+        return map(lambda x: (x, self.url(x)), self.plex_server_addresses)
 
     def _validate_plex_servers(self):
         """
@@ -61,15 +77,14 @@ class ConfigManager:
         :return:
         """
         failed_servers = []
-        for server in self.plex_server_addresses:
-            server_url = '{}://{}:32400'.format(self.conn_security, server)
+        for server, server_url in self.servers_url:
             try:
                 r = requests.get(server_url, verify=self.plex_verify_ssl)
                 if r.status_code == 401:
                     continue
                 print('Unexpected status code {} from Plex server'.format(str(r.status_code)))
-            except ConnectionError as e:
-                print('Failed to connect to Plex server ' + server)
+            except ConnectionError:
+                print('Failed to connect to Plex server', server)
                 failed_servers.append(server)
 
         # Do we have any valid servers left?

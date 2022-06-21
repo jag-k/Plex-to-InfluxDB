@@ -1,5 +1,5 @@
 FROM python
-MAINTAINER Andrew Chumchal <andrew@andrewchumchal.com>
+LABEL org.opencontainers.image.authors="SvenDowideit@home.org.au"
 
 VOLUME /src/
 COPY plexcollector.py requirements.txt /src/
